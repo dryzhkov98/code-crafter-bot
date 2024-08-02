@@ -4,9 +4,9 @@ export type ConfigFunctions<T> = {
 };
 
 export interface IAppConfigSchema {
-  PORT: number;
+  BOT_TOKEN: string;
 
-  URL: string;
+  VERSION: string;
 }
 
 export interface IAppConfigOption<T> {
