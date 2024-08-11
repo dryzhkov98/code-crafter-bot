@@ -64,44 +64,46 @@ export class AppConfigService<T extends IAppConfigSchema> {
   }
 
   public get(): ConfigFunctions<T> {
-    // перехватываем обращение к свойствам функции и переопределяем getter
-    return new Proxy({} as ConfigFunctions<T>, {
+    return new Proxy<ConfigFunctions<T>>({} as ConfigFunctions<T>, {
       get: (_, prop: string | symbol) => {
-        if (typeof prop !== 'string') {
+        const configKey = this.validateConfigKey(prop);
+
+        if (!configKey) {
           return undefined;
         }
 
-        const configKey = prop.toUpperCase();
-
-        // если prop symbol или не существует в конфиге
-        if (this.isInvalidProp(this.configuration, configKey)) {
-          return undefined;
-        }
-
-        // создаем геттер для возвращения значения их конфига
-        return this.createValueGetter(this.configuration, configKey as keyof T);
+        return this.createValueGetter(this.configuration, configKey);
       },
     });
   }
 
-  private isInvalidProp(target: T, prop: string | symbol): boolean {
-    return (
-      typeof prop === 'symbol' ||
-      !Object.prototype.hasOwnProperty.call(target, prop)
-    );
+  private isInvalidProp(target: T, prop: keyof T): boolean {
+    return !Object.prototype.hasOwnProperty.call(target, prop);
   }
 
-  private createValueGetter(target: T, prop: keyof T) {
+  private createValueGetter<U extends keyof T>(target: T, prop: U): () => T[U] {
     return () => {
       const value = target[prop];
-      if (typeof value === 'undefined') {
+      if (value === undefined) {
         throw new TypeError(
-          `Configuration key ${String(
-            prop
-          )} is not defined or has an undefined value.`
+          `Configuration key 
+          "${String(prop)}" 
+          is not defined or has an undefined value.`
         );
       }
       return value;
     };
+  }
+
+  private validateConfigKey(prop: string | symbol): keyof T | undefined {
+    if (typeof prop !== 'string') {
+      return undefined;
+    }
+
+    const configKey = prop.toUpperCase() as keyof T;
+
+    return this.isInvalidProp(this.configuration, configKey)
+      ? undefined
+      : configKey;
   }
 }
