@@ -3,7 +3,12 @@ import { AppConfigModule } from './config/app-config/app-config.module';
 import { AppConfigSchema } from './config/app-config/app-config.schema';
 
 @Module({
-  imports: [AppConfigModule.forRoot({ appConfig: AppConfigSchema })],
+  imports: [
+    AppConfigModule.forRootAsync({
+      appConfig: AppConfigSchema,
+      envPath: '.env',
+    }),
+  ],
   controllers: [],
   providers: [],
 })

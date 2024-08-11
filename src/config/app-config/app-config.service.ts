@@ -11,6 +11,7 @@ import { plainToInstance } from 'class-transformer';
 import { validateSync } from 'class-validator';
 import { Inject, Injectable } from '@nestjs/common';
 import { readFileSync } from 'node:fs';
+import { readFile } from 'node:fs/promises';
 
 @Injectable()
 export class AppConfigService<T extends IAppConfigSchema> {
@@ -19,10 +20,36 @@ export class AppConfigService<T extends IAppConfigSchema> {
 
   constructor(@Inject(APP_CONFIG) { appConfig, envPath }: IAppConfigOption<T>) {
     this.envPath = envPath || join(process.cwd(), '.env');
-    this.setupConfig(appConfig);
+    if (envPath) {
+      this.setupConfig(appConfig);
+    }
   }
+
+  public get(): ConfigFunctions<T> {
+    return new Proxy<ConfigFunctions<T>>({} as ConfigFunctions<T>, {
+      get: (_, prop: string | symbol) => {
+        const configKey = this.validateConfigKey(prop);
+
+        if (!configKey) {
+          return undefined;
+        }
+
+        return this.createValueGetter(this.configuration, configKey);
+      },
+    });
+  }
+
+  public async initAsync(appConfig: ConfigType<T>): Promise<void> {
+    await this.setupConfigAsync(appConfig);
+  }
+
   private setupConfig(appConfig: ConfigType<T>): void {
     const envs = this.getEnvsFromFile(this.envPath);
+    this.configuration = this.validate(appConfig, envs);
+  }
+
+  private async setupConfigAsync(appConfig: ConfigType<T>): Promise<void> {
+    const envs = await this.getEnvsFromFileAsync(this.envPath);
     this.configuration = this.validate(appConfig, envs);
   }
 
@@ -48,33 +75,32 @@ export class AppConfigService<T extends IAppConfigSchema> {
 
   private getEnvsFromFile(path: string): Record<string, string> {
     const env: Record<string, string> = {};
-
     try {
       const envData = readFileSync(path, 'utf8').split('\n');
       for (const envLine of envData) {
         const [key, value] = envLine.split('=').map(str => str.trim());
-
         if (key && value) env[key] = value;
       }
-
       return env;
     } catch (error) {
       throw new Error(`Failed to load .env file from path: ${path}`);
     }
   }
 
-  public get(): ConfigFunctions<T> {
-    return new Proxy<ConfigFunctions<T>>({} as ConfigFunctions<T>, {
-      get: (_, prop: string | symbol) => {
-        const configKey = this.validateConfigKey(prop);
-
-        if (!configKey) {
-          return undefined;
-        }
-
-        return this.createValueGetter(this.configuration, configKey);
-      },
-    });
+  private async getEnvsFromFileAsync(
+    path: string
+  ): Promise<Record<string, string>> {
+    const env: Record<string, string> = {};
+    try {
+      const envData = (await readFile(path, 'utf8')).split('\n');
+      for (const envLine of envData) {
+        const [key, value] = envLine.split('=').map(str => str.trim());
+        if (key && value) env[key] = value;
+      }
+      return env;
+    } catch (error) {
+      throw new Error(`Failed to load .env file from path: ${path}`);
+    }
   }
 
   private isInvalidProp(target: T, prop: keyof T): boolean {

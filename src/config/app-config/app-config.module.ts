@@ -1,5 +1,5 @@
 import { DynamicModule, Global, Module } from '@nestjs/common';
-import { IAppConfigOption } from './app-config.types';
+import { IAppConfigOption, IAppConfigSchema } from './app-config.types';
 import { APP_CONFIG } from './app-config.constants';
 import { AppConfigService } from './app-config.service';
 
@@ -16,6 +16,30 @@ export class AppConfigModule {
         },
         AppConfigService,
       ],
+      exports: [AppConfigService],
+    };
+  }
+
+  static forRootAsync<T extends IAppConfigSchema>(
+    options: IAppConfigOption<T>
+  ): DynamicModule {
+    const appConfigProvider = {
+      provide: APP_CONFIG,
+      useValue: options,
+    };
+
+    const appConfigServiceProvider = {
+      provide: AppConfigService,
+      useFactory: async () => {
+        const service = new AppConfigService<T>(options);
+        await service.initAsync(options.appConfig);
+        return service;
+      },
+    };
+
+    return {
+      module: AppConfigModule,
+      providers: [appConfigProvider, appConfigServiceProvider],
       exports: [AppConfigService],
     };
   }
