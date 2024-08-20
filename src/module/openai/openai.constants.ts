@@ -1,0 +1,2 @@
+export const OPENAI_CONFIG_TOKEN = Symbol('OPENAI_CONFIG_TOKEN');
+export const OPENAI_API_TOKEN = Symbol('OPENAI_API_TOKEN');
